@@ -67,3 +67,7 @@ A more in-depth description of usage. Any template arguments? A complicated exam
 * Confluence link:
 * Asana board:
 * etc...
+
+###
+
+- refactor so it include tugas biasa, skripsi, kp, and other ta fpik
