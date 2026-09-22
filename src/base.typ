@@ -1,318 +1,388 @@
-/* ======================================================================= */
-/* HELPERS (top-level, so content.typ can import them too)                 */
-/* ======================================================================= */
+/* =========================================================================
+   BASE TEMPLATE: FPIK UNSOED manuscript style
 
-// Sequence-element marker. NOTE: `[a b].func()` is `text`, NOT `sequence`,
-// so it must be built by concatenation.
-#let _seq = ([] + []).func()
+   What this file does:
+     Sets up the whole look of the document: page size, margins, font,
+     headings, tables, figures, bibliography, and the cover page.
+     You write your content in another file; this file only controls
+     how it looks.
 
-/* sci-upper -------------------------------------------------------------
-   Uppercases a title but leaves italic runs alone, so binomial names stay
-   lowercase-correct:  #sci-upper[budidaya #emph[Thunnus albacares]]
-   -> BUDIDAYA Thunnus albacares
-   This replaces the commented-out `title-sci` regex attempt, which could
-   not work: a regex show rule receives a text element whose `style` field
-   is `auto` in markup, never "italic".                                    */
-#let sci-upper(it) = {
-  if it == none { return none }
-  if type(it) == str { return upper(it) }
-  let f = it.func()
-  if f == text {
-    if it.at("style", default: auto) in ("italic", "oblique") { it } else { upper(it.text) }
-  } else if f == emph {
-    it
-  } else if f == _seq {
-    it.children.map(sci-upper).join()
-  } else if f == strong {
-    strong(sci-upper(it.body))
-  } else if it.has("body") {
-    f(sci-upper(it.body))
-  } else {
-    it
-  }
-}
+   How to use it (at the top of your main file):
 
-/* people-block ----------------------------------------------------------
-   Accepts either:
-     ("Ani Haryati, S.I.K., M.Si.", "Hendrayana, S.Kel., M.Si.")   -> centered lines
-     ((nama: "Salma Munadhiva", nim: "L1C022038"), ...)            -> Nama | NIM table
-   Mixed arrays work; rows without a NIM leave the second column blank.    */
-#let _name-of(e) = {
-  if type(e) == dictionary { e.at("nama", default: e.at("name", default: [])) } else { e }
-}
-#let _nim-of(e) = {
-  if type(e) == dictionary { e.at("nim", default: none) } else { none }
-}
+     #import "base.typ": *
+     #show: manuscript.with(
+       pre-title: [Modul Praktikum Oseanografi Kimia],
+       doc-title: [Teknik Sampling],
+       authors: ((nama: "Salma Munadhiva", nim: "L1C022038"),),
+       program-studi: "Ilmu Kelautan",
+       fakultas: "Perikanan dan Ilmu Kelautan",
+       univ: "Universitas Jenderal Soedirman",
+     )
 
-#let people-block(entries, width: 11cm, row-gutter: 0.65em) = {
-  if entries == none or entries.len() == 0 { return }
-  let tabular = entries.any(e => _nim-of(e) != none)
-  if entries.len() == 1 and _nim-of(entries.at(0)) != none {
-    _name-of(entries.at(0))
-    linebreak()
-    _nim-of(entries.at(0))
-  } else if tabular {
-    block(width: width, grid(
-      columns: (1fr, auto),
-      column-gutter: 1em,
-      row-gutter: row-gutter,
-      align: (left, left),
-      ..entries.map(e => (_name-of(e), _nim-of(e))).flatten().map(x => if x == none [] else [#x]),
-    ))
-  } else {
-    entries.map(e => [#_name-of(e)]).join(linebreak())
-  }
-}
+     = Pendahuluan
+     Your text here...
 
-/* tabel ----------------------------------------------------------------
-   Wrapper for wide/long tables. Shrinks type and cell padding so fr columns
-   actually fit the text block, then wraps in a figure so it gets "Tabel N."
-   Long tables flow across pages and table.header() repeats automatically.
+   The file has two parts:
+     1. HELPERS:  small tools you can also use inside your own content.
+     2. TEMPLATE: the `manuscript` function that styles the whole document.
+   ========================================================================= */
 
-     #tabel(
-       caption: [Ringkasan region BGC],   // MUST be [ ], not " "
-       columns: (auto, 1.8fr, 1fr, 2.2fr, 1.5fr),
-       align: (center + horizon, left + horizon, ..),
-       table.header([*Region*], ..),
-       [Region 1], ..
-     )                                                                    */
-#let tabel(
-  caption: none,
-  size: 9pt,
-  cell-inset: (x: 0.45em, y: 0.5em),
-  gutter: 0pt,
-  ..args
-) = figure(
-  {
-    set text(size: size)
-    set table(inset: cell-inset, column-gutter: gutter)
-    table(..args)
-  },
-  caption: caption,
-  kind: table,
-  supplement: auto,
-)
 
-/* ======================================================================= */
-/* TEMPLATE                                                                */
-/* ======================================================================= */
-
-#let _default-logo = image("logo-unsoed.png")
-
-#let manuscript(
-  /* --- cover: title block ------------------------------------------- */
-  cover: true,
-  pre-title: none,          // "Modul Praktikum Oseanografi Kimia"
-  doc-title: none,          // "Teknik Sampling : Pengukuran dan Pengambilan Sampel"
-  subtitle: none,           // optional extra line, not bold
-  logo: _default-logo,
-  logo-width: 2.5cm,
-  title-width: 12cm,        // measure the title wraps in; keeps it off the margins
-
-  /* --- cover: people ------------------------------------------------- */
-  author-label: [Oleh:],
-  authors: (),
-  supervisor-label: none,   // e.g. [Asisten:] or [Dosen Pembimbing:]
-  supervisors: (),
-  people-width: 10cm,
-
-  /* --- cover: institution footer ------------------------------------- */
-  program-studi: none,      // "Ilmu Kelautan"   -> "PROGRAM STUDI ILMU KELAUTAN"
-  fakultas: none,           // "Perikanan dan Ilmu Kelautan" -> "FAKULTAS ..."
-  univ: none,               // full string, printed as-is (uppercased)
-  place: none,              // "Purwokerto" — omitted on the FPIK example cover
-  date: auto,               // auto = datetime.today()
-  year: auto,               // auto = derived from `date`
-
-  /* --- cover: geometry ----------------------------------------------- */
-  cover-balanced-margins: false, // ignore the 3,5 cm binding margin on the cover
-  gap-title-logo: 4em,
-  gap-logo-subtitle: 2em,
-  gap-subtitle-authors: 4em,
-  gap-authors-supervisors: 2em,
-
-  body,
-) = {
-
-/* ====================================================================== */
-/* SETUP                                                                  */
-/* ====================================================================== */
-
-/* Code Setup ----------------------------------------------------------- */
-
-// NOTE: these were `import` (no #) *inside* the function body, which scopes
-// them to the template only — content.typ could never see them — and they
-// were unused. Uncomment at TOP LEVEL (above this #let) if you need them.
+/* Optional packages. Remove the `//` in front of a line to enable it.
+   They must stay up here, outside `manuscript`, so your content file
+   can use them too. */
 // #import "@preview/cmarker:0.1.8"
 // #import "@preview/callisto:0.2.5"
 // #import "@preview/mitex:0.2.6": mitex
 
-/* Document metadata ---------------------------------------------------- */
 
-let _date = if date == auto { datetime.today() } else { date }
-let _year = if year == auto {
-  if _date == none { none } else { str(_date.year()) }
-} else { str(year) }
+/* =========================================================================
+   PART 1: SETTINGS
+   Shared values used in several places. Change them here once,
+   instead of hunting through the file.
+   ========================================================================= */
 
-set document(
-  title: if doc-title == none { "" } else { doc-title },
-  author: authors.map(_name-of).filter(n => type(n) == str),
-  ..(if _date == none { (:) } else { (date: _date) }),
-)
+#let _default-logo = image("logo-unsoed.png")   // cover logo
+#let _default-csl  = "fpik_adapted_apa.csl"     // citation style file
 
-/* Document Formatting -------------------------------------------------- */
+/* Page margins. Left is wider (3.5 cm) to leave room for binding.
+   `_margin-balanced` is the same margin on both sides, for an
+   optional symmetric cover. */
+#let _margin          = (left: 3.5cm, right: 2.5cm, top: 2.5cm, bottom: 2.5cm)
+#let _margin-balanced = (left: 2.5cm, right: 2.5cm, top: 2.5cm, bottom: 2.5cm)
 
-// @note batas kiri 3,5 cm  -> binding margin
-set page(
-  paper: "a4",
-  margin: (left: 3.5cm, right: 2.5cm, top: 2.5cm, bottom: 2.5cm),
-)
-set text(font: "Book Antiqua", size: 12pt)
-set text(lang: "id") // Instantly changes 'section' references to 'Bagian'
-set bibliography(style: "fpik_adapted_apa.csl")
+#let _indent = 1.5cm   // first-line paragraph indent, list indent, heading number width
 
-/* Title Formatting ----------------------------------------------------- */
 
-// 1. Set text style and alignment
-show title: set align(center)
-show title: set text(size: 14pt, weight: "bold")
+/* =========================================================================
+   PART 2: HELPERS
+   Small tools. They can also be imported by your content file.
+   ========================================================================= */
 
-// 2. Set spacing around the title block
-show title: set block(
-  above: 2em,   // Space pushing the title down from the top margin or logo
-  below: 3em    // Space pushing the body text or abstract down away from the title
-)
+/* Internal tool (you don't need to touch this).
+   Lets the code recognise "a piece of text made of several parts".
+   It must be built this way; the obvious-looking shortcut gives the
+   wrong result. */
+#import "utils/lib.typ": *
 
-// 3. Set leading between lines (if the title wraps into multiple lines)
-show title: set par(leading: 0.5em)
 
-// Master uppercase rule — now italic-safe via sci-upper, handles 'auto'
-show title: it => {
-  let final-content = if it.body == auto { document.title } else { it.body }
-  block(sci-upper(final-content))
+/* people-block: prints a list of people (authors, supervisors).
+
+   Two ways to give the names:
+
+     Names only -> one centred name per line
+       ("Ani Haryati, S.I.K., M.Si.", "Hendrayana, S.Kel., M.Si.")
+
+     Names with student ID (NIM) -> two columns: Nama | NIM
+       ((nama: "Salma Munadhiva", nim: "L1C022038"), ...)
+
+   You can mix both; people without a NIM get an empty NIM column.
+   A single person with a NIM is printed as name, then NIM below it. */
+
+// Read the name from an entry ("nama" or "name"; plain text works too).
+#let _name-of(e) = {
+    if type(e) == dictionary { e.at("nama", default: e.at("name", default: [])) } else { e }
 }
 
-/* General Body Text Formatting ----------------------------------------- */
+// Read the NIM from an entry. Returns nothing if there isn't one.
+#let _nim-of(e) = {
+    if type(e) == dictionary { e.at("nim", default: none) } else { none }
+}
 
-set par(
-    // KUNCI UTAMA: Menggunakan dictionary (amount, all: true)
-    // Ini memaksa indentasi pada SETIAP paragraf pertama di mana pun.
-    first-line-indent: (amount: 1cm, all: true),
-    justify: true,
-    leading: 2em,
-    spacing: 2em
+#let people-block(entries, width: 11cm, row-gutter: 0.65em) = {
+    if entries == none or entries.len() == 0 { return }
+
+    let has-nim = entries.any(e => _nim-of(e) != none)
+
+    if entries.len() == 1 and has-nim {
+        // One person: name, then NIM on the next line.
+        _name-of(entries.first())
+        linebreak()
+        _nim-of(entries.first())
+    } else if has-nim {
+        // Several people with NIMs: two-column table.
+        block(width: width, grid(
+            columns: (1fr, auto),
+            column-gutter: 1em,
+            row-gutter: row-gutter,
+            align: left,
+            ..entries
+                .map(e => (_name-of(e), _nim-of(e)))
+                .flatten()
+                .map(x => if x == none [] else [#x]),
+        ))
+    } else {
+        // Names only: one per line.
+        entries.map(e => [#_name-of(e)]).join(linebreak())
+    }
+}
+
+
+/* tabel: a table with a numbered caption ("Tabel 1. ...").
+
+   Use it for wide or long tables. It uses slightly smaller text and
+   tighter cells so the columns fit the page. Long tables continue onto
+   the next page, and the header row repeats automatically.
+
+     #tabel(
+       caption: [Ringkasan region BGC],        // use [ ], not " "
+       columns: (auto, 1.8fr, 1fr, 2.2fr, 1.5fr),
+       align: (center + horizon, left + horizon, ..),
+       table.header([*Region*], ..),
+       [Region 1], ..
+     )
+
+   Options:
+     size        text size inside the table
+     cell-inset  space around the text in each cell
+     gutter      gap between columns
+   Everything else is passed on to a normal Typst `table`. */
+#let tabel(
+    caption: none,
+    size: 9pt,
+    cell-inset: (x: 0.45em, y: 0.5em),
+    gutter: 0pt,
+    ..args
+) = figure(
+    {
+        set text(size: size)
+        set table(inset: cell-inset, column-gutter: gutter)
+        table(..args)
+    },
+    caption: caption,
+    kind: table,
 )
 
-set enum(indent: 1cm, spacing: 1.5em)
-show enum: it => { set par(leading: 1.5em); it }
 
-set list(indent: 1cm, spacing: 1.5em)
-show list: it => { set par(leading: 1.5em); it }
+/* =========================================================================
+   PART 3: TEMPLATE
+   `manuscript` styles the whole document. Every option below has a
+   default, so you only fill in the ones you need.
+   ========================================================================= */
 
-/* Style Heading (Disederhanakan, Tanpa Hack Manual) -------------------- */
+#let manuscript(
+    /* Cover: title ------------------------------------------------------- */
+    cover: true,               // false = no cover page
+    pre-title: none,           // small line above the title, e.g. "Modul Praktikum ..."
+    doc-title: none,           // main title (also saved as the PDF title)
+    subtitle: none,            // extra line under the logo, not bold
+    logo: _default-logo,       // none = no logo
+    logo-width: 2.5cm,
+    title-width: 12cm,         // max width of the title before it wraps
 
-// 1. MASTER HEADING CONFIGURATION
+    /* Cover: people ------------------------------------------------------ */
+    author-label: [Oleh:],     // text above the author names
+    authors: (),               // see `people-block` above for the format
+    supervisor-label: none,    // e.g. [Asisten:] or [Dosen Pembimbing:]
+    supervisors: (),
+    people-width: 10cm,        // width of the Nama | NIM table
 
+    /* Cover: institution (bottom of the page, printed in CAPITALS) ------- */
+    program-studi: none,       // "Ilmu Kelautan" -> PROGRAM STUDI ILMU KELAUTAN
+    fakultas: none,            // "Perikanan dan Ilmu Kelautan" -> FAKULTAS ...
+    univ: none,                // full university name
+    place: none,               // city, e.g. "Purwokerto" (optional)
+    date: auto,                // auto = today
+    year: auto,                // auto = the year from `date`
+
+    /* Cover: spacing ----------------------------------------------------- */
+    cover-balanced-margins: false, // true = equal left/right margins on the cover only
+    gap-title-logo: 4em,
+    gap-logo-subtitle: 2em,
+    gap-subtitle-authors: 4em,
+    gap-authors-supervisors: 2em,
+
+    body,                      // your content (filled in automatically by #show)
+) = {
+
+/* ---------------------------------------------------------------------
+    DOCUMENT INFO
+    Works out the date and year, and saves title/author/date in the
+    PDF properties.
+    --------------------------------------------------------------------- */
+
+let _date = if date == auto { datetime.today() } else { date }
+let _year = if year != auto { str(year) } else if _date != none { str(_date.year()) } else { none }
+
+set document(
+    ..(if doc-title != none { (title: doc-title) }),
+    author: authors.map(_name-of).filter(n => type(n) == str),  // plain-text names only
+    ..(if _date != none { (date: _date) }),
+)
+
+
+/* ---------------------------------------------------------------------
+    PAGE AND TEXT
+    A4 paper, Book Antiqua 12 pt, Indonesian language. The language
+    setting makes Typst write "Gambar", "Tabel", "Bagian", etc.
+    --------------------------------------------------------------------- */
+
+set page(paper: "a4", margin: _margin)
+
+/* If Book Antiqua isn't installed, the next similar font in the list
+    is used, so the document still compiles. */
+set text(
+    font: ("Book Antiqua", "Palatino Linotype", "TeX Gyre Pagella"),
+    size: 12pt,
+    lang: "id",
+)
+
+
+
+
+/* ---------------------------------------------------------------------
+    PARAGRAPHS AND LISTS
+    Justified text, double spacing, and a 1 cm indent on the first line
+    of every paragraph (including the first one after a heading).
+    Lists are indented 1 cm with slightly tighter line spacing.
+    --------------------------------------------------------------------- */
+
+set par(
+    first-line-indent: (amount: _indent, all: true),
+    justify: true,
+    leading: 2em,    // space between lines inside a paragraph
+    spacing: 2em,    // space between paragraphs
+)
+
+set enum(indent: _indent, spacing: 1.5em)   // numbered lists (1. 2. 3.)
+set list(indent: _indent, spacing: 1.5em)   // bullet lists
+show enum: set par(leading: 1.5em)
+show list: set par(leading: 1.5em)
+
+
+/* ---------------------------------------------------------------------
+    HEADINGS
+
+    Level 1  (= Pendahuluan)     -> new page, centred, bold, 14 pt, CAPITALS
+                                    with a Roman numeral: "I. PENDAHULUAN"
+    Level 2  (== Latar Belakang) -> bold,    "1.1  Latar Belakang"
+    Level 3+ (=== ...)           -> regular, "1.1.1  ..."
+
+    To remove the number from one heading, add <nonumber> after it:
+        = Daftar Pustaka <nonumber>
+    --------------------------------------------------------------------- */
+
+/* Numbering rule: level 1 gets no number here (its Roman numeral is
+    added below); deeper levels get "1.1.", "1.1.1.", and so on. */
 set heading(numbering: (..nums) => {
     let n = nums.pos()
-    if n.len() == 1 { none } else { n.map(str).join(".") }
+    if n.len() == 1 { none } else { n.map(str).join(".") + "." }
 })
 
-// Strip the default native bold from ALL headings first
-show heading: set text(weight: "regular")
-// Headings must never inherit the 1cm body first-line indent
+show <nonumber>: set heading(numbering: none)
+
+// Headings never get the 1 cm first-line indent.
 show heading: set par(first-line-indent: 0pt)
 
-// 2. DYNAMIC HEADING TEMPLATE ENGINE
-
 show heading: it => {
-    if it.level == 1 { // --- HEADING 1 (BAB) ---
-        pagebreak(weak: true)
+    let num = counter(heading).at(it.location())   // e.g. (1, 2) for heading 1.2
+
+    if it.level == 1 {
+        // Level 1: chapter title
+        pagebreak(weak: true)   // start on a new page (no blank page if already at the top)
         set align(center)
+        set par(leading: 0.5em)
 
-        let title-content = if it.numbering != none {
-            let bab_num = numbering("I", counter(heading).at(it.location()).first())
-            sci-upper([#bab_num. #it.body])
+        let title = if it.numbering != none {
+            title-upper([#numbering("I", num.first()). #it.body])
         } else {
-            sci-upper(it.body)
+            title-upper(it.body)
         }
-
-        // Force bold explicitly inside the text element
-        block(text(size: 14pt, weight: "bold", title-content))
+        block(text(size: 14pt, weight: "bold", title))
         v(2em)
 
-    } else { // --- HEADING 2, 3, AND BELOW ---
-        v(1em)
-
-        let heading-weight = if it.level == 2 { "bold" } else { "regular" }
-
+    } else {
+        // Level 2 and deeper: section titles
+        let weight = if it.level == 2 { "bold" } else { "regular" }
+        set text(size: 12pt, weight: weight)
         set par(leading: 1em)
 
+        v(1em)
         if it.numbering != none {
-            // Numbered heading -> Use strict 1cm layout alignment columns
+            // Number in a fixed 1 cm column, so all titles line up.
             grid(
-                columns: (1cm, 1fr),
-                gutter: 0pt,
-                text(size: 12pt, weight: heading-weight,
-                     numbering(it.numbering, ..counter(heading).at(it.location()))),
-                text(size: 12pt, weight: heading-weight, it.body)
+                columns: (_indent, 1fr),
+                numbering(it.numbering, ..num),
+                it.body,
             )
         } else {
-            // Unnumbered heading -> Flush against left margin, no indent
-            block(width: 100%, text(size: 12pt, weight: heading-weight, it.body))
+            block(width: 100%, it.body)
         }
         v(1em)
     }
 }
 
-show <nonumber> : set heading(numbering: none)
-// use <nonumber> to make heading not numbered!
 
-/* Daftar-daftar Isi ---------------------------------------------------- */
+/* ---------------------------------------------------------------------
+    TABLE OF CONTENTS  (#outline())
+    No indent. Chapter entries are bold and in CAPITALS, but scientific
+    names in italics keep their normal case (same rule as the headings).
+    --------------------------------------------------------------------- */
 
-// Un-commented and made valid: inside a code block the leading `#` must go.
 set outline(indent: 0em)
-show outline.entry.where(level: 1): it => strong(upper(it))
+
+/* Rebuilds a chapter entry piece by piece so only the title text is
+    capitalised: the entry still links to its page, keeps the dotted
+    line, and shows the page number. */
+show outline.entry.where(level: 1): it => strong(link(
+    it.element.location(),
+    it.indented(it.prefix(), {
+        title-upper(it.body())
+        [ ]
+        box(width: 1fr, it.fill)
+        sym.wj                // keeps the page number on the same line
+        it.page()
+    }),
+))
 show outline: set block(spacing: 1em)
 show outline: set par(leading: 1em, first-line-indent: 0pt)
 
-/* Visual Style Figure -------------------------------------------------- */
 
-// Single source of truth for captions. The old file had a `show figure:`
-// rebuild PLUS a global `show figure.caption.where(kind: image)` rule; the
-// two fought each other, and the table branch emitted the literal string
-// "cap.supplement". `set text(lang: "id")` already gives "Gambar"/"Tabel"
-// through `it.supplement`, so no manual prefix table is needed.
-show figure.caption: it => {
-  set par(leading: 0.65em, justify: true, first-line-indent: 0pt)
-  strong(it.supplement)
-  [ ]
-  strong(context it.counter.display(it.numbering))
-  [. ]
-  it.body
-}
+/* ---------------------------------------------------------------------
+    FIGURES AND CAPTIONS
 
-show figure: set block(spacing: 2em, breakable: true)  // long tables may span pages
-show figure: set par(leading: 1em, first-line-indent: 0pt)
+    Captions look like:  Gambar 1. Caption text
+                        Tabel 1. Caption text
+    ("Gambar 1" / "Tabel 1" in bold)
 
-// Tabel: caption di ATAS (konvensi ilmiah), gambar: caption di bawah
+    Images: caption BELOW.  Tables: caption ABOVE (scientific convention).
+    --------------------------------------------------------------------- */
+
+set figure(supplement: [Gambar])
+show figure.where(kind: table): set figure(supplement: [Tabel])
 show figure.where(kind: table): set figure.caption(position: top)
 
-/* TABLES --------------------------------------------------------------- */
+show figure.caption: it => {
+    set par(leading: 0.65em, justify: true, first-line-indent: 0pt)
+    strong(it.supplement)
+    [ ]
+    strong(context it.counter.display(it.numbering))
+    [. ]
+    it.body
+}
 
-// header / hline / content
+show figure: set block(spacing: 2em, breakable: true)   // long tables may continue on the next page
+show figure: set par(leading: 1em, first-line-indent: 0pt)
+
+
+/* ---------------------------------------------------------------------
+    TABLES
+    Scientific "three-line" style:
+        a thick line on top, a thick line under the header row,
+        and a thick line at the bottom. No other lines.
+    --------------------------------------------------------------------- */
+
 set table(
-    stroke: (x, y) => {
-        if y == 0 { (bottom: 1.5pt) } // Header bottom line
-        else { (x: 0pt, y: 0pt) }     // All standard interior grid lines
-    },
+    stroke: (x, y) => if y == 0 { (bottom: 1.5pt) },   // line under the header row only
     column-gutter: 5pt,
     inset: 1em,
 )
-// Outer top/bottom rules. MUST be `breakable: true`, otherwise a table taller
-// than one page is clipped instead of flowing. `width: 100%` is required when
-// the table uses fr columns: inside an auto-width block, fr resolves against
-// infinite space and the columns overflow the right margin.
+
+/* Top and bottom lines, drawn around the whole table.
+    - breakable: lets a long table continue on the next page
+        instead of being cut off.
+    - width 100%: needed when columns use "fr" widths, otherwise
+        the table runs past the right margin. */
 show table: it => {
     let cols = it.at("columns", default: auto)
     let has-fr = type(cols) == array and cols.any(c => type(c) == fraction)
@@ -320,92 +390,113 @@ show table: it => {
         width: if has-fr { 100% } else { auto },
         breakable: true,
         stroke: (top: 1.5pt, bottom: 1.5pt),
-        radius: 0pt,
         it,
     )
 }
-show table.cell: set par(leading: 1em, first-line-indent: 0pt)
+
+// Text inside table cells: 11 pt, tighter lines, no indent.
 show table.cell: set text(size: 11pt)
+show table.cell: set par(leading: 0.5em, first-line-indent: 0pt)
 
-/* Daftar Pustaka ------------------------------------------------------- */
 
-show bibliography: set par(leading: 1em, first-line-indent: 0pt, spacing: 2em)
+/* ---------------------------------------------------------------------
+    BIBLIOGRAPHY  (Daftar Pustaka)
+    No first-line indent; space between entries.
+    --------------------------------------------------------------------- */
 
-/* ====================================================================== */
-/* AUTOFIX ABBREVIATION                                                   */
-/* ====================================================================== */
+set bibliography(style: _default-csl)
 
-show "yg": "yang"
+show bibliography: set par(
+    leading: 1em, 
+    first-line-indent: 0pt, 
+    spacing: 2em
+)
 
-/* ====================================================================== */
-/* COVER                                                                  */
-/* ====================================================================== */
+
+/* ---------------------------------------------------------------------
+    AUTO-EXPAND ABBREVIATIONS
+    Replaces common chat shorthand in the final PDF:
+        yg -> yang,  dgn -> dengan,  utk -> untuk
+    Only whole words are replaced, so words that merely contain
+    these letters are left alone.
+    --------------------------------------------------------------------- */
+
+show regex("\\byg\\b"): "yang"
+show regex("\\bdgn\\b"): "dengan"
+show regex("\\butk\\b"): "untuk"
+
+
+/* ---------------------------------------------------------------------
+    COVER PAGE
+    From top to bottom:
+        pre-title, title, logo, subtitle, authors, supervisors,
+        and the institution block at the bottom of the page.
+    Anything left as `none` or empty is skipped.
+    --------------------------------------------------------------------- */
 
 if cover {
-  page(
-    margin: if cover-balanced-margins {
-      (left: 2.5cm, right: 2.5cm, top: 2.5cm, bottom: 2.5cm)
-    } else {
-      (left: 3.5cm, right: 2.5cm, top: 2.5cm, bottom: 2.5cm)
-    },
-    numbering: none,
-    header: none,
-    footer: none,
-    {
-      set align(center)
-      set par(leading: 0.65em, spacing: 0.65em, first-line-indent: 0pt, justify: false)
+    page(
+        margin: if cover-balanced-margins { _margin-balanced } else { _margin },
+        numbering: none,
+        header: none,
+        footer: none,
+        {
+            set align(center)
+            set par(leading: 0.65em, spacing: 0.65em, first-line-indent: 0pt, justify: false)
 
-      // --- title block ---
-      block(width: title-width, {
-        if pre-title != none {
-          text(size: 12pt, weight: "bold", sci-upper(pre-title))
-          v(4em)
-        }
-        if doc-title != none {
-          text(size: 14pt, weight: "bold", sci-upper(doc-title))
-        }
-      })
+            // Title block
+            block(width: title-width, {
+                if pre-title != none {
+                    text(size: 12pt, weight: "bold", title-upper(pre-title))
+                    v(4em)
+                }
+                if doc-title != none {
+                    text(size: 14pt, weight: "bold", title-upper(doc-title))
+                }
+            })
 
-      // --- logo ---
-      if logo != none {
-        v(gap-title-logo)
-        box(width: logo-width, logo)
-      }
+            // Logo
+            if logo != none {
+                v(gap-title-logo)
+                box(width: logo-width, logo)
+            }
 
-      // --- subtitle ---
-      if subtitle != none {
-        v(gap-logo-subtitle)
-        text(size: 12pt, weight: "regular", subtitle)
-      }
+            // Subtitle
+            if subtitle != none {
+                v(gap-logo-subtitle)
+                text(size: 12pt, subtitle)
+            }
 
-      // --- people ---
-      if authors.len() > 0 {
-        v(if logo != none { gap-subtitle-authors } else { gap-title-logo })
-        text(weight: "bold", {
-          if author-label != none { author-label; linebreak() }
-          people-block(authors, width: people-width)
-        })
-      }
-      if supervisors.len() > 0 {
-        v(gap-authors-supervisors)
-        if supervisor-label != none { supervisor-label; linebreak() }
-        people-block(supervisors, width: people-width)
-      }
+            // Authors (bold)
+            if authors.len() > 0 {
+                v(if logo != none { gap-subtitle-authors } else { gap-title-logo })
+                text(weight: "bold", {
+                    if author-label != none { author-label; linebreak() }
+                    people-block(authors, width: people-width)
+                })
+            }
 
-      // --- institution footer, pinned to the bottom margin ---
-      v(1fr)
-      text(weight: "bold", {
-        let lines = ()
-        if program-studi != none { lines.push(upper[Program Studi #program-studi]) }
-        if fakultas != none { lines.push(upper[Fakultas #fakultas]) }
-        if univ != none { lines.push(upper[#univ]) }
-        if place != none { lines.push(upper[#place]) }
-        if _year != none { lines.push([#_year]) }
-        lines.join(linebreak())
-      })
-    },
-  )
+            // Supervisors (regular)
+            if supervisors.len() > 0 {
+                v(gap-authors-supervisors)
+                if supervisor-label != none { supervisor-label; linebreak() }
+                people-block(supervisors, width: people-width)
+            }
+
+            // Institution block, pushed to the bottom of the page.
+            v(1fr)
+            text(weight: "bold", {
+                let lines = ()
+                if program-studi != none { lines.push(upper[Program Studi #program-studi]) }
+                if fakultas != none      { lines.push(upper[Fakultas #fakultas]) }
+                if univ != none          { lines.push(upper[#univ]) }
+                if place != none         { lines.push(upper[#place]) }
+                if _year != none         { lines.push([#_year]) }
+                lines.join(linebreak())
+            })
+        },
+    )
 }
 
-  body
+body
 }
