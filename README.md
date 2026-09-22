@@ -71,3 +71,30 @@ A more in-depth description of usage. Any template arguments? A complicated exam
 ###
 
 - refactor so it include tugas biasa, skripsi, kp, and other ta fpik
+- adapt subfigure
+
+### Local packages
+
+Want to install a package locally on your system without publishing it or
+experiment with it before publishing? You can store packages in
+`{data-dir}/typst/packages/{namespace}/{name}/{version}` to make them available
+locally on your system. Here, `{data-dir}` is
+
+- `$XDG_DATA_HOME` or `~/.local/share` on Linux
+- `~/Library/Application Support` on macOS
+- `%APPDATA%` on Windows
+
+You may also run `typst info` and check _Package path_ for the actual path. This
+would be helpful if you have installed the Typst compiler from Snap or are using
+special environment variables.
+
+You can create an arbitrary `{namespace}`. A good namespace for system-local
+packages is `local`. Using this namespace:
+
+- Store a package in `{data-dir}/typst/packages/local/mypkg/1.0.0`
+- Import from it with `#import "@local/mypkg:1.0.0": *`.
+
+Packages in the data directory have precedence over ones in the cache directory.
+
+Note that future iterations of Typst's package management may change/break this
+local setup.
