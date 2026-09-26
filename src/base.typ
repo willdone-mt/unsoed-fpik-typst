@@ -51,6 +51,41 @@
 #let _margin          = (left: 3.5cm, right: 2.5cm, top: 2.5cm, bottom: 2.5cm)
 #let _margin-balanced = (left: 2.5cm, right: 2.5cm, top: 2.5cm, bottom: 2.5cm)
 
+// ---- Daftar Pustaka: same author(s) as previous entry -> line ----------
+// Guide FPIK 2018: repeated author(s) replaced by an underline; entries
+// already sorted oldest -> newest by the CSL.
+#let _plain(c) = {
+  if type(c) == str { c }
+  else if type(c) != content { "" }
+  else if c.has("text") and type(c.text) == str { c.text }
+  else if c.has("children") { c.children.map(_plain).join("") }
+  else if c.has("body") { _plain(c.body) }
+  else if c.has("child") { _plain(c.child) }
+  else if c.func() == [ ].func() { " " }
+  else { "" }
+}
+#let _bib-prev = state("dp-prev-author", none)
+
+#let same-author-line(it) = {
+  _bib-prev.update(none)                       // reset per bibliography
+  show block: b => context {
+    let txt = _plain(b.body).trim()
+    // author = everything before " 2009." / " 2009a." / " n.d."
+    let m = txt.match(regex("^(.+?)\s+(\d{4}[a-z]?|n\.d\.)[.,]"))
+    if m == none { return b }
+    let author = m.captures.at(0)
+    let prev = _bib-prev.get()
+    let upd = _bib-prev.update(author)         // keep in output!
+    if prev != author { return upd + b }
+    let w = measure(author).width              // line as wide as the name
+    let rule = box(width: w, height: 0.15em, stroke: (bottom: 0.6pt))
+    // replace the name, keep its final "." -> "______. 2010."
+    let bare = author.trim(".", at: end)
+    upd + { show bare: rule; b }
+  }
+  it
+}
+
 #let _indent = 1.5cm   // first-line paragraph indent, list indent, heading number width
 
 
@@ -411,6 +446,7 @@ show bibliography: set par(
     first-line-indent: 0pt, 
     spacing: 2em
 )
+show bibliography: same-author-line
 
 
 /* ---------------------------------------------------------------------
